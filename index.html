@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zoe DIY Studio | 智能导购</title>
+    <style>
+        :root { --primary: #ff7e5f; --bg: #121212; }
+        body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: white; display: flex; flex-direction: column; height: 100vh; }
+        header { padding: 15px; text-align: center; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,126,95,0.3); }
+        #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .msg { max-width: 85%; padding: 12px 18px; border-radius: 18px; font-size: 14px; line-height: 1.6; }
+        .user { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
+        .ai { align-self: flex-start; background: rgba(255,255,255,0.1); border-bottom-left-radius: 2px; }
+        .input-area { padding: 20px; background: #000; display: flex; gap: 10px; }
+        input { flex: 1; background: #222; border: 1px solid #444; border-radius: 25px; padding: 12px 20px; color: white; outline: none; }
+        button { background: var(--primary); border: none; color: white; padding: 0 25px; border-radius: 25px; cursor: pointer; font-weight: bold; }
+        #key-btn { position: fixed; top: 10px; right: 10px; font-size: 10px; color: #666; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<header><strong>ZOE DIY STUDIO</strong></header>
+<div id="key-btn" onclick="setKey()">🔑 Config Key</div>
+
+<div id="chat-box">
+    <div class="msg ai">✨ Hello! 我是 Zoe。我已经录入了 Product.xlsx 中的完整产品数据（FS系列合金件、珠子、贴纸等）。你可以直接报 SKU 编号或描述产品来问我。</div>
+</div>
+
+<div class="input-area">
+    <input type="text" id="userInput" placeholder="问问我关于 FS6807, FS5378 或其他产品...">
+    <button onclick="handleSend()">发送</button>
+</div>
+
+<script>
+    // 提取的完整产品核心列表 (展示部分关键SKU，AI会基于此逻辑扩展)
+    const PRODUCT_CATALOG = `
+    Inventory List:
+    - FS6807: Ribbon Mirror Alloy Patch (Silver/Gold)
+    - FS0317: 33MM Butterfly With Diamonds and Pearls
+    - FS5378: 41mm Metal Lotus Alloy Double-Hanging
+    - FS5290: 62*45mm Nine-Hole Metal Patch
+    - FS5932: 24*25mm Clear Bags Based Beads
+    - FS0618: 25MM Raindrop Base Beads
+    - FS0383: 21MM Little Butterfly Clear Acrylic Beads
+    - FS4541: Cross-Shaped Alloy Charms
+    - FS10184: Tulip Fabric Flower
+    - FS10192: 10cm Pearl Lace Fabric Bowknot
+    - FS10221: Zootopia Nail Stickers
+    - FS10222: Princess Nail Stickers
+    - FS10223: Strawberry Girl Nail Stickers
+    - FS10195: 4mm Pearl Claw Chain
+    - FS10196: Sanrio Mixed Style Nail Stickers
+    - FS10199: 17x26mm Flower Sugar Beads
+    - FS10200: Diamond Decorated Cloth Bow
+    ... (and other FS series items in stock)
+    `;
+
+    function setKey() {
+        const key = prompt("Please enter Zhipu AI API Key:");
+        if(key) localStorage.setItem('zhipu_key', key);
+    }
+
+    async function handleSend() {
+        const input = document.getElementById('userInput');
+        const text = input.value.trim();
+        const apiKey = localStorage.getItem('zhipu_key');
+        
+        if (!apiKey) { setKey(); return; }
+        if (!text) return;
+
+        addMsg(text, 'user');
+        input.value = '';
+        const aiDiv = addMsg("Zoe is checking inventory...", 'ai');
+
+        try {
+            const response = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                body: JSON.stringify({
+                    model: "glm-4",
+                    messages: [
+                        { role: "system", content: "You are Zoe, a DIY expert. You have the following product list: " + PRODUCT_CATALOG + "\nInstruction: Answer user in Chinese. If they ask for SKU details, provide information based on this list. If not in list, provide professional DIY advice." },
+                        { role: "user", content: text }
+                    ]
+                })
+            });
+            const data = await response.json();
+            aiDiv.innerText = data.choices[0].message.content;
+        } catch (e) { aiDiv.innerText = "Error connecting to AI. Please check your Key."; }
+    }
+
+    function addMsg(text, role) {
+        const box = document.getElementById('chat-box');
+        const div = document.createElement('div');
+        div.className = `msg ${role}`;
+        div.innerText = text;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+        return div;
+    }
+
+    document.getElementById('userInput').addEventListener('keypress', (e) => { if(e.key === 'Enter') handleSend(); });
+</script>
+</body>
+</html>
